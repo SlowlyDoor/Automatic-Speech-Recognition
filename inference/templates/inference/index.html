@@ -1,0 +1,82 @@
+{% extends 'inference/base.html' %}
+{% load static %}
+
+{% block title %}Распознавание речи{% endblock %}
+
+{% block content %}
+<body>
+	<div class="asr-card">
+	  <h3 class="text-center mb-4">Распознавание речи</h3>
+
+	  <!-- ===== nav-pills Файл / Запись ===== -->
+	  <ul class="nav nav-pills nav-justified mb-4" id="modeTabs">
+	    <li class="nav-item"><button class="nav-link active" data-mode="file">Файл</button></li>
+	    <li class="nav-item"><button class="nav-link" data-mode="rec">Онлайн запись</button></li>
+	  </ul>
+
+	  <!-- ===== Блок: загрузка файла ===== -->
+	  <div id="fileBlock">
+	    <input type="file" class="form-control mb-2" id="audio_file" accept=".wav,.mp3,.ogg">
+	    <div id="fileSupport" class="form-text">Поддержка: WAV, MP3, OGG, WEBA</div>
+		<div id="fileInfo" class="small text-muted mt-1"></div>
+		<div id="fileError" class="form-text text-danger mt-1"></div>
+	    <audio id="filePlayer" controls class="w-100 mt-2 d-none"></audio>
+	  </div>
+
+	  <!-- ===== Блок: запись ===== -->
+	  <div id="recBlock" class="text-center d-none">
+	    <button id="micBtn" class="mic-btn" title="Начать запись">
+	      <i class="fa-solid fa-microphone"></i>
+	    </button>
+	    <div class="d-flex justify-content-center align-items-center gap-2 mt-2" id="recIndicator" style="display:none">
+	      <span class="rec-dot"></span><span id="recTime" class="fw-semibold">00:00</span>
+	    </div>
+	    <audio id="recordedAudio" controls class="w-100 mt-3 d-none"></audio>
+	  </div>
+
+	  <!-- ===== Параметры ===== -->
+	  <div class="row g-3 mt-4 mb-3">
+	    <div class="col-md">
+	      <label class="form-label">Язык</label>
+	      <select id="language" class="form-select"><option value="ru">Русский</option></select>
+	    </div>
+	    <div class="col-md">
+	      <label class="form-label">Модель</label>
+	      <select id="model" class="form-select">
+	        <option value="whisper">Whisper</option>
+	        <option value="wav2vec2">Wav2Vec2</option>
+	      </select>
+	    </div>
+	  </div>
+
+	  <!-- ===== Кнопка распознавания ===== -->
+	  <div class="d-grid mb-3">
+	    <button id="recognizeBtn" class="btn btn-primary fw-semibold py-2">
+	      Распознать
+	    </button>
+	  </div>
+	  <div id="processingTime" class="text-center small text-secondary mb-3" hidden>
+	    <span class="text-muted">Обработано за</span> <span id="timeValue">--</span> сек
+	  </div>
+
+	  <!-- ===== Результат ===== -->
+	    <h5 class="fw-semibold mb-2">Текст:</h5>
+
+	    <pre id="result"
+	         class="result-box"
+	         tabindex="0"
+	         onfocus="document.execCommand && document.execCommand('selectAll',false,null)">Здесь появится расшифрованный текст…</pre>
+
+
+	  <!-- ===== Экспорт ===== -->
+	  <div class="download-group justify-content-end mt-2" id="dlButtons" hidden>
+	    <button class="btn btn-outline-secondary btn-sm" id="saveTxt"><i class="fa-regular fa-file-lines me-1"></i>TXT</button>
+	    <button class="btn btn-outline-secondary btn-sm" id="savePDF"><i class="fa-regular fa-file-pdf me-1"></i>PDF</button>
+	  </div>
+	</div>
+</body>
+{% endblock %}
+
+{% block extra_scripts %}
+<script type="module" src="{% static 'inference/js/app.js' %}"></script>
+{% endblock %}
