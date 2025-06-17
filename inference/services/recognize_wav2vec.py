@@ -1,17 +1,17 @@
-import os
+from django.conf import settings
+from pathlib import Path
+from transformers import Wav2Vec2Processor, Wav2Vec2ForCTC
 import logging
+import os
 import torch
 import torchaudio
-from transformers import Wav2Vec2Processor, Wav2Vec2ForCTC
-from .recognizer_base import BaseRecognizer
 
-# Настраиваем логгер
-logger = logging.getLogger(__name__)
-logger.setLevel(logging.INFO)
+LOGGER = logging.getLogger(__name__)
+LOGGER.setLevel(logging.INFO)
+BASE_DIR = Path(settings.BASE_DIR)
+MODEL_DIR = BASE_DIR / 'models' / 'wav2vec2-large-ru-5ep'
 
-MODEL_DIR = r"D:\ВКР\project\asr_project\models\wav2vec2-large-ru-5ep"
-
-class Wav2Vec2Recognizer(BaseRecognizer):
+class Wav2Vec2Recognizer():
     _instance = None
 
     def __new__(cls):
@@ -23,7 +23,7 @@ class Wav2Vec2Recognizer(BaseRecognizer):
 
     def load_model(self):
         if self.model is None or self.processor is None:
-            logger.info("Загрузка модели Wav2Vec2...")
+            LOGGER.info("Загрузка модели Wav2Vec2...")
             self.processor = Wav2Vec2Processor.from_pretrained(MODEL_DIR)
             self.model = Wav2Vec2ForCTC.from_pretrained(MODEL_DIR)
 
@@ -31,15 +31,15 @@ class Wav2Vec2Recognizer(BaseRecognizer):
                 self.model = self.model.to("cuda").half()
 
             self.model.eval()
-            logger.info("Модель Wav2Vec2 загружена.")
+            LOGGER.info("Модель Wav2Vec2 загружена.")
 
     def recognize(self, audio_path: str, language: str = "ru") -> str:
         self.load_model()
 
-        logger.info(f"Распознавание Wav2Vec2")
+        LOGGER.info(f"Распознавание Wav2Vec2")
 
         waveform, sr = torchaudio.load(audio_path)
-        waveform = waveform.mean(dim=0, keepdim=True)  # mono
+        waveform = waveform.mean(dim=0, keepdim=True)
 
         inputs = self.processor(waveform.squeeze().numpy(), sampling_rate=sr, return_tensors="pt", padding=True)
         with torch.no_grad():

@@ -132,6 +132,8 @@ MEDIA_ROOT = BASE_DIR / 'media'
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
+LOG_DIR = BASE_DIR / 'logs'
+LOG_DIR.mkdir(exist_ok=True)
 
 LOGGING = {
     'version': 1,
@@ -150,7 +152,7 @@ LOGGING = {
         'file': {
             'level': 'INFO',
             'class': 'logging.FileHandler',
-            'filename': os.path.join(BASE_DIR, 'logs', 'asr.log'),
+            'filename': LOG_DIR / 'asr.log',
             'formatter': 'verbose',
         },
         'console': {
@@ -160,7 +162,7 @@ LOGGING = {
         },
     },
     'loggers': {
-        '': {  # root logger
+        '': { 
             'handlers': ['file', 'console'],
             'level': 'INFO',
         },

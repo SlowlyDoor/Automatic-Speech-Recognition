@@ -8,7 +8,7 @@ class RecognizeService:
         elif model_name == "wav2vec2":
             self.recognizer = Wav2Vec2Recognizer()
         else:
-            raise ValueError(f"Unknown model name: {model_name}")
+            raise ValueError(f"Модель не найдена: {model_name}")
 
     def recognize(self, audio_path: str, language: str = "ru") -> str:
         return self.recognizer.recognize(audio_path, language)

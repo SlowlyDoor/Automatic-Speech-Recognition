@@ -48,7 +48,7 @@ venv\Scripts\activate    # для Windows
 ### Установить зависимости
 
 ```bash
-pip install --upgrade pip
+python.exe -m pip install --upgrade pip
 pip install -r requirements.txt
 ```
 
@@ -62,9 +62,9 @@ pip install -r requirements.txt
 Выполните следующие команды:
 
 ```bash
-git clone https://huggingface.co/internalhell/whisper_small_ru_model_trainer_3ep models/whisper_small_ru_model_trainer_3ep
+git clone https://huggingface.co/internalhell/whisper_small_ru_model_trainer_3ep
 
-git clone https://huggingface.co/internalhell/wav2vec2-large-ru-5ep models/wav2vec2-large-ru-5ep
+git clone https://huggingface.co/internalhell/wav2vec2-large-ru-5ep
 ```
 
 После этого структура папки `models/` будет следующая:
@@ -73,6 +73,24 @@ git clone https://huggingface.co/internalhell/wav2vec2-large-ru-5ep models/wav2v
 models/
 ├── whisper_small_ru_model_trainer_3ep/
 └── wav2vec2-large-ru-5ep/
+```
+---
+
+## Установка ffmpeg
+
+Для поддержки конвертации аудиофайлов в формат WAV используется библиотека `pydub`, которая требует установленного [ffmpeg](https://ffmpeg.org/).
+
+Установите `ffmpeg` одним из следующих способов:
+
+- **Windows:**  
+  Скачайте готовый бинарник: https://www.gyan.dev/ffmpeg/builds/  
+  Добавьте путь к `ffmpeg/bin` в переменную среды `PATH`.
+
+- **Linux (Ubuntu/Debian):**
+
+```bash
+sudo apt update
+sudo apt install ffmpeg
 ```
 
 ---
