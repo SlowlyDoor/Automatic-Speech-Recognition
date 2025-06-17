@@ -16,23 +16,27 @@
 
 	  <!-- ===== Блок: загрузка файла ===== -->
 	  <div id="fileBlock">
-	    <input type="file" class="form-control mb-2" id="audio_file" accept=".wav,.mp3,.ogg">
-	    <div id="fileSupport" class="form-text">Поддержка: WAV, MP3, OGG, WEBA</div>
+	    <input type="file" class="form-control mb-2" id="audio_file" accept=".wav,.mp3,.ogg,.webm,.weba">
+	    <div id="fileSupport" class="form-text">Поддержка: WAV, MP3, OGG, WEBM (WEBA)</div>
 		<div id="fileInfo" class="small text-muted mt-1"></div>
 		<div id="fileError" class="form-text text-danger mt-1"></div>
 	    <audio id="filePlayer" controls class="w-100 mt-2 d-none"></audio>
 	  </div>
 
 	  <!-- ===== Блок: запись ===== -->
-	  <div id="recBlock" class="text-center d-none">
-	    <button id="micBtn" class="mic-btn" title="Начать запись">
-	      <i class="fa-solid fa-microphone"></i>
-	    </button>
-	    <div class="d-flex justify-content-center align-items-center gap-2 mt-2" id="recIndicator" style="display:none">
-	      <span class="rec-dot"></span><span id="recTime" class="fw-semibold">00:00</span>
-	    </div>
-	    <audio id="recordedAudio" controls class="w-100 mt-3 d-none"></audio>
-	  </div>
+	 	<div id="recBlock" class="text-center d-none">
+	 		<div class="mic-btn-block">
+	 			<button id="micBtn"   class="mic-btn"   title="Начать запись"><i class="fa-solid fa-microphone"></i></button>
+				<button id="pauseBtn" class="mic-btn small d-none" title="Пауза / продолжить">
+				    <i class="fa-solid fa-pause"></i>
+				</button>
+	 		</div>
+			<div class="d-flex justify-content-center align-items-center gap-2 mt-2" id="recIndicator" style="display:none">
+			    <span class="rec-dot"></span><span id="recTime" class="fw-semibold">00:00</span>
+			</div>
+		    <audio id="recordedAudio" controls class="w-100 mt-3 d-none"></audio>
+		</div>
+
 
 	  <!-- ===== Параметры ===== -->
 	  <div class="row g-3 mt-4 mb-3">

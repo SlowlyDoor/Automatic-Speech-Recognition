@@ -2,11 +2,12 @@ import { getCookie, saveBlob } from './utils.js';
 import { MicRecorder } from './recorder.js';
 
 /* ================== Константы ================== */
-const ALLOWED_EXTENSIONS = ['.wav', '.mp3', '.ogg', '.webm'];
-const FILE_SUPPORT_TEXT = 'Поддержка: WAV, MP3, OGG, WEBM';
-const FILE_ERROR_TEXT = 'Недопустимый формат файла. Разрешены только: WAV, MP3, OGG, WEBM.';
+const ALLOWED_EXTENSIONS = ['.wav', '.mp3', '.ogg', '.webm', '.weba'];
+const FILE_SUPPORT_TEXT = 'Поддержка: WAV, MP3, OGG, WEBM (WEBA)';
+const FILE_ERROR_TEXT = 'Недопустимый формат файла. Разрешены только: WAV, MP3, OGG, WEBM (WEBA).';
 const PROCESSING_TEXT = 'Обработка';
 const AUDIO_FILENAME_FOR_UPLOAD = 'rec.webm';
+const AUDIOFILE_INCORRECT = 'Файл повреждён или не является поддерживаемым аудио'
 
 /* ================== DOM ссылки ================== */
 const elements = {
@@ -30,7 +31,8 @@ const elements = {
   langSel: document.getElementById('language'),
   fileError: document.getElementById('fileError'),
   fileSupport: document.getElementById('fileSupport'),
-  recordedAudio: document.getElementById('recordedAudio')
+  recordedAudio: document.getElementById('recordedAudio'),
+  pauseBtn: document.getElementById('pauseBtn')
 };
 
 /* ================== Состояние ================== */
@@ -40,9 +42,10 @@ let recordedBlob = null;
 let timer = 0, sec = 0;
 const recorder = new MicRecorder();
 let waitingInterval = null;
+let inProgress = false;
 
 /* ================== UI ================== */
-function showResult(text, secs) {
+function showResult(text, secs, ok = true) {
   clearInterval(waitingInterval);
   waitingInterval = null;
 
@@ -51,7 +54,14 @@ function showResult(text, secs) {
     elements.timeVal.textContent = secs;
     elements.timeWrap.hidden = false;
   }
-  elements.dlButtons.hidden = false;
+  elements.dlButtons.hidden = !ok;
+
+  if (ok) {
+      const payload = { text, secs, ts: Date.now(), model: elements.modelSel.value, lang: elements.langSel.value };
+      localStorage.setItem('lastTranscription', JSON.stringify(payload));
+  } else {
+      localStorage.removeItem('lastTranscription');
+  }
   console.info('Распознавание завершено.');
 }
 
@@ -79,48 +89,65 @@ function setTab(mode) {
 
 function updateRecognizeButtonState() {
   const isFileReady = (activeMode === 'file' && uploadedFile);
-  const isRecReady = (activeMode === 'rec' && recordedBlob);
+  const isRecReady  = (activeMode === 'rec'  && recordedBlob);
 
-  const isEnabled = (isFileReady || isRecReady);
+  const canStart = (isFileReady || isRecReady) && !inProgress;
 
-  // Доп. защита — ставим или убираем класс
-  elements.recognizeBtn.classList.toggle('btn-disabled', !isEnabled);
+  elements.recognizeBtn.classList.toggle('btn-disabled', !canStart);
+  elements.recognizeBtn.disabled = !canStart;          // ← физически блокируем
 }
 
 /* ================== Файл: загрузка и проверка ================== */
-elements.audioInput.addEventListener('change', e => {
+elements.audioInput.addEventListener('change', async e => {
   uploadedFile = e.target.files[0] || null;
 
-  elements.fileError.style.display = 'none';
-  elements.fileError.textContent = '';
+  // Сброс сообщений
+  elements.fileError.style.display   = 'none';
+  elements.fileError.textContent     = '';
   elements.fileSupport.style.display = 'block';
-  elements.fileSupport.textContent = FILE_SUPPORT_TEXT;
+  elements.fileSupport.textContent   = FILE_SUPPORT_TEXT;
 
   if (!uploadedFile) {
     resetFileInput();
     return;
   }
 
-  const fileName = uploadedFile.name.toLowerCase();
-  const isValid = ALLOWED_EXTENSIONS.some(ext => fileName.endsWith(ext));
+  /* --- 1. проверка расширения ------------------------------------------------------- */
+  const isValidExt = ALLOWED_EXTENSIONS
+        .some(ext => uploadedFile.name.toLowerCase().endsWith(ext));
 
-  if (!isValid) {
+  if (!isValidExt) {
     resetFileInput();
     elements.fileSupport.style.display = 'none';
-    elements.fileError.style.display = 'block';
-    elements.fileError.textContent = FILE_ERROR_TEXT;
+    elements.fileError.style.display   = 'block';
+    elements.fileError.textContent     = FILE_ERROR_TEXT;
     return;
   }
 
+  /* --- 2. проверка: файл действительно аудио и не битый ----------------------------- */
+  try {
+    await testAudioPlayable(uploadedFile);
+  } catch {
+    resetFileInput();
+    elements.fileSupport.style.display = 'none';
+    elements.fileError.style.display   = 'block';
+    elements.fileError.textContent     = AUDIOFILE_INCORRECT;
+    return;
+  }
+
+  /* --- 3. отображаем информацию и включаем плеер ----------------------------------- */
   elements.fileSupport.style.display = 'block';
-  elements.fileError.style.display = 'none';
+  elements.fileError.style.display   = 'none';
 
   const url = URL.createObjectURL(uploadedFile);
   elements.filePlayer.src = url;
   elements.filePlayer.classList.remove('d-none');
   elements.filePlayer.onloadedmetadata = () => {
-    elements.fileInfo.textContent = `${uploadedFile.name} · ${(uploadedFile.size / 1048576).toFixed(2)} МБ · ${elements.filePlayer.duration.toFixed(1)} сек`;
+    elements.fileInfo.textContent =
+      `${uploadedFile.name} · ${(uploadedFile.size / 1048576).toFixed(2)} МБ · `
+      + `${elements.filePlayer.duration.toFixed(1)} сек`;
   };
+
   updateRecognizeButtonState();
 });
 
@@ -140,6 +167,7 @@ function resetFileInput() {
 
 /* ================== Запись ================== */
 elements.micBtn.onclick = () => elements.micBtn.classList.contains('recording') ? stopRec() : startRec();
+elements.pauseBtn.onclick = () => togglePause();
 
 async function startRec() {
   setTab('rec');
@@ -154,11 +182,23 @@ async function startRec() {
   elements.recInd.style.display = 'flex';
   elements.micBtn.classList.add('recording');
   elements.micBtn.innerHTML = '<i class="fa fa-stop"></i>';
-  timer = setInterval(() => {
-    sec++;
-    elements.recTime.textContent = `${String(sec / 60 | 0).padStart(2, '0')}:${String(sec % 60).padStart(2, '0')}`;
-  }, 1000);
+  elements.pauseBtn.classList.remove('d-none');
+  elements.pauseBtn.innerHTML = '<i class="fa fa-pause"></i>';
+  timer = setInterval(updateTimer, 1000);
   console.info('Запись начата');
+}
+
+function togglePause() {
+  if (!recorder.isPaused) {
+    recorder.pause();
+    elements.pauseBtn.innerHTML = '<i class="fa fa-play"></i>';
+    elements.recDot?.classList.add('paused');
+    console.info('Запись поставлена на паузу');
+  } else {
+    recorder.resume();
+    elements.pauseBtn.innerHTML = '<i class="fa fa-pause"></i>';
+    console.info('Запись возобновлена');
+  }
 }
 
 function stopRec() {
@@ -166,37 +206,51 @@ function stopRec() {
   elements.recInd.style.display = 'none';
   elements.micBtn.classList.remove('recording');
   elements.micBtn.innerHTML = '<i class="fa fa-microphone"></i>';
+  elements.pauseBtn.classList.add('d-none');
   recorder.stop();
   console.info('Запись остановлена');
-  // Примечание: recordedBlob сохраняется → updateRecognizeButtonState не нужен тут, потому что оно уже есть
 }
 
+function updateTimer() {
+  if (!recorder?.#recorder || recorder.#recorder.state !== 'recording') return;
+  if (!recorder.isPaused) {
+    sec++;
+    elements.recTime.textContent = `${String(sec/60|0).padStart(2,'0')}:${String(sec%60).padStart(2,'0')}`;
+  }
+}
 /* ================== Распознавание ================== */
 elements.recognizeBtn.onclick = () => {
+  if (inProgress) return;                              
+
   const isFileReady = (activeMode === 'file' && uploadedFile);
-  const isRecReady = (activeMode === 'rec' && recordedBlob);
-  if (!(isFileReady || isRecReady)) {
-    console.warn('Попытка отправить без готового файла или записи — заблокировано.');
-    return;
-  }
+  const isRecReady  = (activeMode === 'rec'  && recordedBlob);
+  if (!(isFileReady || isRecReady)) return;
 
   const formData = new FormData();
   if (isFileReady) formData.append('audio_file', uploadedFile);
-  else if (isRecReady) formData.append('audio_file', recordedBlob, AUDIO_FILENAME_FOR_UPLOAD);
+  else              formData.append('audio_file', recordedBlob, AUDIO_FILENAME_FOR_UPLOAD);
 
-  formData.append('model', elements.modelSel.value);
-  formData.append('language', elements.langSel.value);
+  formData.append('model',     elements.modelSel.value);
+  formData.append('language',  elements.langSel.value);
 
+  /* --- блокируем кнопку и показываем «Обработка…» -------------------- */
+  inProgress = true;
+  updateRecognizeButtonState();
   showWaiting();
+
   fetch('/api/transcribe/', {
-    method: 'POST',
-    body: formData,
-    headers: { 'X-CSRFToken': getCookie('csrftoken') },
-    credentials: 'same-origin'
+        method: 'POST',
+        body:   formData,
+        headers:{ 'X-CSRFToken': getCookie('csrftoken') },
+        credentials:'same-origin'
   })
     .then(r => r.json())
-    .then(d => showResult(d.text || 'Пустой результат', d.processing_time))
-    .catch(e => showResult('Ошибка:\n' + e));
+    .then(d => showResult(d.text || 'Пустой результат', d.processing_time, true))
+    .catch(e => showResult('Ошибка:\n' + e, null, false))
+    .finally(() => {                                   
+        inProgress = false;
+        updateRecognizeButtonState();
+    });
 };
 
 /* ================== Скачивание ================== */
@@ -207,3 +261,37 @@ elements.savePdfBtn.onclick = () => pdfMake.createPdf({ content: elements.result
 /* ================== Инициализация ================== */
 elements.tabs.forEach(btn => btn.addEventListener('click', () => setTab(btn.dataset.mode)));
 setTab('file');
+/* --- если есть кэш, показываем его сразу --- */
+(function restoreLast() {
+  /* Если есть готовый результат — выводим его */
+  const cached = localStorage.getItem('lastTranscription');
+  if (!cached) return;
+
+  try {
+      const { text, secs } = JSON.parse(cached);
+      if (text) showResult(text, secs);
+  } catch (_) {/* повреждённые данные – игнорируем */}
+})();
+
+
+/* ================== Проверка аудиофайла ================== */
+function testAudioPlayable(file) {
+  return new Promise((resolve, reject) => {
+    const probe = document.createElement('audio');
+    probe.preload = 'metadata';
+
+    const url = URL.createObjectURL(file);
+
+    probe.oncanplaythrough = () => {
+      URL.revokeObjectURL(url);
+      resolve(true);
+    };
+
+    probe.onerror = () => {
+      URL.revokeObjectURL(url);
+      reject(new Error('Браузер не смог декодировать файл'));
+    };
+
+    probe.src = url;
+  });
+}
