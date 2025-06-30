@@ -45,7 +45,7 @@ let waitingInterval = null;
 let inProgress = false;
 
 /* ================== UI ================== */
-function showResult(text, secs) {
+function showResult(text, secs, ok = true) {
   clearInterval(waitingInterval);
   waitingInterval = null;
 
@@ -54,17 +54,14 @@ function showResult(text, secs) {
     elements.timeVal.textContent = secs;
     elements.timeWrap.hidden = false;
   }
-  elements.dlButtons.hidden = false;
-  
-   /* --- кэшируем результат, чтобы не потерять при F5 --- */
-  const payload = {
-    text,                         // сам текст
-    secs,                         // время обработки
-    ts:   Date.now(),             // когда получен
-    model: elements.modelSel.value,
-    lang:  elements.langSel.value
-  };
-  localStorage.setItem('lastTranscription', JSON.stringify(payload));
+  elements.dlButtons.hidden = !ok;
+
+  if (ok) {
+      const payload = { text, secs, ts: Date.now(), model: elements.modelSel.value, lang: elements.langSel.value };
+      localStorage.setItem('lastTranscription', JSON.stringify(payload));
+  } else {
+      localStorage.removeItem('lastTranscription');
+  }
   console.info('Распознавание завершено.');
 }
 
@@ -212,10 +209,10 @@ function stopRec() {
   elements.pauseBtn.classList.add('d-none');
   recorder.stop();
   console.info('Запись остановлена');
-  // Примечание: recordedBlob сохраняется → updateRecognizeButtonState не нужен тут, потому что оно уже есть
 }
 
 function updateTimer() {
+  if (!recorder?.#recorder || recorder.#recorder.state !== 'recording') return;
   if (!recorder.isPaused) {
     sec++;
     elements.recTime.textContent = `${String(sec/60|0).padStart(2,'0')}:${String(sec%60).padStart(2,'0')}`;
@@ -240,12 +237,7 @@ elements.recognizeBtn.onclick = () => {
   inProgress = true;
   updateRecognizeButtonState();
   showWaiting();
-  /* --- помним, что задача ушла на сервер --- */
-   localStorage.setItem('pending', JSON.stringify({
-        ts:   Date.now(),                  // когда отправили
-        model: elements.modelSel.value,    // выбранная модель
-        lang:  elements.langSel.value      // язык
-   }));
+
   fetch('/api/transcribe/', {
         method: 'POST',
         body:   formData,
@@ -253,11 +245,10 @@ elements.recognizeBtn.onclick = () => {
         credentials:'same-origin'
   })
     .then(r => r.json())
-    .then(d => showResult(d.text || 'Пустой результат', d.processing_time))
-    .catch(e => showResult('Ошибка:\n' + e))
-    .finally(() => {                                   // ← разблокируем кнопку
+    .then(d => showResult(d.text || 'Пустой результат', d.processing_time, true))
+    .catch(e => showResult('Ошибка:\n' + e, null, false))
+    .finally(() => {                                   
         inProgress = false;
-        localStorage.removeItem('pending'); 
         updateRecognizeButtonState();
     });
 };
@@ -272,13 +263,7 @@ elements.tabs.forEach(btn => btn.addEventListener('click', () => setTab(btn.data
 setTab('file');
 /* --- если есть кэш, показываем его сразу --- */
 (function restoreLast() {
-  /* 1) Если предыдущий запрос ещё «в пути» — снова показываем «Обработка…» */
-  if (localStorage.getItem('pending')) {
-      showWaiting();
-      return;                 // ждём, когда пользователь нажмёт кнопку ещё раз
-  }
-
-  /* 2) Если есть готовый результат — выводим его */
+  /* Если есть готовый результат — выводим его */
   const cached = localStorage.getItem('lastTranscription');
   if (!cached) return;
 
@@ -292,7 +277,6 @@ setTab('file');
 /* ================== Проверка аудиофайла ================== */
 function testAudioPlayable(file) {
   return new Promise((resolve, reject) => {
-    // быстрый «фингерпринт»: браузер сам определит, битый ли контейнер/кодек
     const probe = document.createElement('audio');
     probe.preload = 'metadata';
 

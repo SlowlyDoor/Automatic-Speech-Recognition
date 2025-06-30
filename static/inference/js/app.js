@@ -212,7 +212,7 @@ function stopRec() {
 }
 
 function updateTimer() {
-  if (!recorder?.#recorder || recorder.#recorder.state !== 'recording') return;
+  if (recorder.getState() !== 'recording') return;
   if (!recorder.isPaused) {
     sec++;
     elements.recTime.textContent = `${String(sec/60|0).padStart(2,'0')}:${String(sec%60).padStart(2,'0')}`;
