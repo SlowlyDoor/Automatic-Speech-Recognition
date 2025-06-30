@@ -113,6 +113,11 @@ sudo apt install ffmpeg
 python manage.py migrate
 ```
 
+Для добавления суперпользователя:
+```bash
+python manage.py createsuperuser
+```
+
 ---
 
 ## Запуск сервера
