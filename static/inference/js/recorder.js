@@ -20,4 +20,7 @@ export class MicRecorder {
   pause()  { if (this.#recorder?.state === 'recording')  { this.#recorder.pause();  this.isPaused = true;  } }
   resume() { if (this.#recorder?.state === 'paused')     { this.#recorder.resume(); this.isPaused = false; } }
   stop()   { this.#recorder?.stop(); }
+  getState() {
+    return this.#recorder?.state || null;
+  }
 }
